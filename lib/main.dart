@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
+// import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'home_page.dart';
 import 'history_page.dart';
 import 'profile_page.dart';
@@ -12,21 +12,25 @@ void main() async {
   print('🚀 APP STARTING...');
   
   try {
-    // Load .env file
-    await dotenv.load(fileName: '.env');
-    print('✅ .env loaded');
+    // ⚠️ GANTI DENGAN CREDENTIALS ANDA!
+    const supabaseUrl = 'https://akeymbccmvylyzsutswc.supabase.co/';
+    const supabaseAnonKey = 'sb_publishable_H_KAEWSGzeIP5-h_twFZNg_Rkc-pQjP'; // full key
     
-    // Initialize Supabase
+    // if (supabaseUrl.contains('akeymbccmvylyzsutswc') || 
+    //     supabaseAnonKey.contains('sb_publishable_H_KAEWSGzeIP5-h_twFZNg_Rkc-pQjP')) {
+    //   throw Exception('Please replace with your actual Supabase credentials!');
+    // }
+    
     await Supabase.initialize(
-      url: dotenv.get('SUPABASE_URL'),
-      anonKey: dotenv.get('SUPABASE_ANON_KEY'),
+      url: supabaseUrl,
+      anonKey: supabaseAnonKey,
     );
-    print('✅ Supabase initialized');
     
+    print('✅ Supabase initialized');
     runApp(MyApp());
   } catch (e) {
-    print('❌ Initialization error: $e');
-    runApp(ErrorApp(error: e.toString()));
+    print('❌ Error: $e');
+    runApp(ErrorApp(error: 'Setup error: $e\n\nPlease check main.dart for hardcoded credentials.'));
   }
 }
 

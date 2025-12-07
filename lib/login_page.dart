@@ -77,51 +77,62 @@ class _LoginPageState extends State<LoginPage> {
 
   // Test method untuk bypass login
   Future<void> _testLogin() async {
-    try {
-      setState(() {
-        _isLoading = true;
-      });
-      
-      print('🧪 Testing with demo account...');
-      
-      // Coba sign up dulu, lalu langsung sign in
-      final signUpResponse = await _supabase.auth.signUp(
-        email: 'demo@example.com',
-        password: 'demopassword123',
-      );
-      
-      if (signUpResponse.user != null) {
-        print('✅ Demo account created');
-      }
-      
-      // Langsung sign in dengan credentials yang sama
-      final signInResponse = await _supabase.auth.signInWithPassword(
-        email: 'demo@example.com',
-        password: 'demopassword123',
-      );
-      
-      print('✅ Test login successful');
-      
-    } catch (e) {
-      print('❌ Test login error: $e');
-      // Jika account sudah ada, langsung sign in
+  try {
+    setState(() {
+      _isLoading = true;
+    });
+    
+    print('🧪 Testing with demo account...');
+    
+    // Coba langsung sign in dengan demo account
+    final signInResponse = await _supabase.auth.signInWithPassword(
+      email: 'demo@example.com',
+      password: 'demopassword123',
+    );
+    
+    // ✅ SEKARANG MENGGUNAKAN RESPONSE:
+    print('✅ Test login successful!');
+    print('   Email: ${signInResponse.user?.email}');
+    print('   User ID: ${signInResponse.user?.id}');
+    print('   Session valid: ${signInResponse.session != null}');
+    
+  } on AuthException catch (e) {
+    print('❌ Auth error: ${e.message}');
+    
+    // Jika user tidak ditemukan, buat akun demo
+    if (e.message.contains('Invalid login credentials')) {
       try {
-        final signInResponse = await _supabase.auth.signInWithPassword(
+        print('🔄 Creating demo account...');
+        final signUpResponse = await _supabase.auth.signUp(
           email: 'demo@example.com',
           password: 'demopassword123',
         );
-        print('✅ Test login successful (existing account)');
-      } catch (e2) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Test login failed: $e2')),
-        );
+        
+        if (signUpResponse.user != null) {
+          print('✅ Demo account created. Please click "Quick Test" again.');
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Demo account created! Please click "Quick Test" again to login.')),
+          );
+        }
+      } catch (signUpError) {
+        print('❌ Failed to create demo account: $signUpError');
       }
-    } finally {
-      setState(() {
-        _isLoading = false;
-      });
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Test login failed: ${e.message}')),
+      );
     }
+  } catch (e) {
+    print('❌ Unexpected error: $e');
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Test login failed: $e')),
+    );
+  } finally {
+    setState(() {
+      _isLoading = false;
+    });
   }
+}
 
   @override
   Widget build(BuildContext context) {
