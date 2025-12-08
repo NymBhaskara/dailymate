@@ -20,32 +20,28 @@ class _HistoryPageState extends State<HistoryPage> {
   Future<void> _fetchCompletedTasks() async {
     try {
       final response = await _supabase
-          .from('user_tasks') // GANTI DARI 'tasks' KE 'user_tasks'
+          .from('user_tasks')
           .select('*')
           .eq('user_id', _supabase.auth.currentUser!.id)
           .eq('is_completed', true) // Ambil yang sudah selesai
           .order('completed_at', ascending: false);
 
-      setState(() {
-        _completedTasks = List<Map<String, dynamic>>.from(response);
-        _isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _completedTasks = List<Map<String, dynamic>>.from(response);
+          _isLoading = false;
+        });
+      }
     } catch (error) {
       print('Error fetching completed tasks: $error');
-      setState(() {
-        _isLoading = false;
-      });
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    // Scaffold TANPA AppBar (karena sudah ada di HomePage wrapper)
     return Scaffold(
-      appBar: AppBar(
-        title: Text('History Page'),
-        backgroundColor: Colors.blue,
-        foregroundColor: Colors.white,
-      ),
       body: _isLoading
           ? Center(child: CircularProgressIndicator())
           : SingleChildScrollView(
@@ -55,16 +51,17 @@ class _HistoryPageState extends State<HistoryPage> {
                 children: [
                   Text(
                     'Task History',
-                    style: TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                    ),
+                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
                   ),
-                  
                   SizedBox(height: 24),
-                  
-                  // Group tasks by date
-                  ..._buildTaskGroups(),
+                  _completedTasks.isEmpty
+                    ? Center(
+                        child: Padding(
+                          padding: const EdgeInsets.only(top: 50.0),
+                          child: Text("No completed tasks yet.", style: TextStyle(color: Colors.grey)),
+                        ),
+                      )
+                    : Column(children: _buildTaskGroups()),
                 ],
               ),
             ),
@@ -75,18 +72,26 @@ class _HistoryPageState extends State<HistoryPage> {
     final now = DateTime.now();
     final yesterday = now.subtract(Duration(days: 1));
     
+    // Helper untuk membandingkan tanggal
+    bool isSameDay(DateTime d1, DateTime d2) {
+      return d1.year == d2.year && d1.month == d2.month && d1.day == d2.day;
+    }
+
     final todayTasks = _completedTasks.where((task) {
-      final completedAt = DateTime.parse(task['completed_at']);
-      return completedAt.year == now.year &&
-             completedAt.month == now.month &&
-             completedAt.day == now.day;
+      if (task['completed_at'] == null) return false;
+      return isSameDay(DateTime.parse(task['completed_at']).toLocal(), now);
     }).toList();
     
     final yesterdayTasks = _completedTasks.where((task) {
-      final completedAt = DateTime.parse(task['completed_at']);
-      return completedAt.year == yesterday.year &&
-             completedAt.month == yesterday.month &&
-             completedAt.day == yesterday.day;
+      if (task['completed_at'] == null) return false;
+      return isSameDay(DateTime.parse(task['completed_at']).toLocal(), yesterday);
+    }).toList();
+
+    // Tugas lama (lebih dari kemarin)
+    final olderTasks = _completedTasks.where((task) {
+       if (task['completed_at'] == null) return false;
+       final date = DateTime.parse(task['completed_at']).toLocal();
+       return !isSameDay(date, now) && !isSameDay(date, yesterday);
     }).toList();
 
     return [
@@ -96,7 +101,11 @@ class _HistoryPageState extends State<HistoryPage> {
       ],
       if (yesterdayTasks.isNotEmpty) ...[
         _buildDateSection('Yesterday', yesterdayTasks),
+        SizedBox(height: 24),
       ],
+      if (olderTasks.isNotEmpty) ...[
+         _buildDateSection('Older', olderTasks),
+      ]
     ];
   }
 
@@ -106,11 +115,7 @@ class _HistoryPageState extends State<HistoryPage> {
       children: [
         Text(
           title,
-          style: TextStyle(
-            fontSize: 18,
-            fontWeight: FontWeight.bold,
-            color: Colors.blue,
-          ),
+          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.blue),
         ),
         SizedBox(height: 12),
         ...tasks.map((task) => _buildHistoryItem(task)).toList(),
@@ -124,8 +129,8 @@ class _HistoryPageState extends State<HistoryPage> {
       child: ListTile(
         leading: Icon(Icons.check_circle, color: Colors.green),
         title: Text(task['title'] ?? 'No Title'),
-        subtitle: Text(task['category'] ?? 'No Category'),
-        trailing: Icon(Icons.arrow_forward_ios, size: 16),
+        subtitle: Text("${task['category']} • +${task['xp_reward'] ?? 0} XP"),
+        // trailing: Icon(Icons.arrow_forward_ios, size: 16), // Opsional
       ),
     );
   }
