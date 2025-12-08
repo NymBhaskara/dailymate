@@ -20,10 +20,10 @@ class _HistoryPageState extends State<HistoryPage> {
   Future<void> _fetchCompletedTasks() async {
     try {
       final response = await _supabase
-          .from('tasks')
+          .from('user_tasks') // GANTI DARI 'tasks' KE 'user_tasks'
           .select('*')
           .eq('user_id', _supabase.auth.currentUser!.id)
-          .eq('is_completed', true)
+          .eq('is_completed', true) // Ambil yang sudah selesai
           .order('completed_at', ascending: false);
 
       setState(() {
