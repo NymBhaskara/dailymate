@@ -49,7 +49,7 @@ class _HomePageState extends State<HomePage> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text('Pilih Kategori Fokus', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+              Text('Select Category', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
               SizedBox(height: 20),
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceAround,
@@ -96,7 +96,7 @@ class _HomePageState extends State<HomePage> {
           .eq('category', category);
 
       if (poolResponse.isEmpty) {
-        throw Exception("Belum ada data tugas untuk kategori ini di database!");
+        throw Exception("There is no assignment data for this category in the database yet!");
       }
 
       // 2. Pilih 1 secara ACAK
@@ -116,7 +116,7 @@ class _HomePageState extends State<HomePage> {
       await _fetchUserTasks();
       
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Tugas baru berhasil dibuat! Semangat!')),
+        SnackBar(content: Text('New task created successfully!')),
       );
 
     } catch (error) {
@@ -140,7 +140,7 @@ class _HomePageState extends State<HomePage> {
 
       _fetchUserTasks(); // Refresh list
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Tugas selesai! XP bertambah (logic next)')),
+        SnackBar(content: Text('Task completed! XP increased by')),
       );
     } catch (error) {
       print('Error completing task: $error');
@@ -176,9 +176,9 @@ class _HomePageState extends State<HomePage> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text('Siap untuk berkembang hari ini?', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                        Text('Are you ready to do some task?', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
                         SizedBox(height: 8),
-                        Text('Pilih kategori dan dapatkan tugas harianmu!', style: TextStyle(color: Colors.grey[600])),
+                        Text('Generate some from the button below!', style: TextStyle(color: Colors.grey[600])),
                         SizedBox(height: 16),
                         ElevatedButton(
                           onPressed: _showCategorySelector, // Munculkan pilihan kategori
@@ -195,10 +195,10 @@ class _HomePageState extends State<HomePage> {
                   SizedBox(height: 24),
                   
                   // LIST TUGAS AKTIF
-                  Text('Tugas Aktif Kamu', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                  Text('Your Tasks', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                   SizedBox(height: 12),
                   _activeTasks.isEmpty 
-                    ? Text("Belum ada tugas aktif. Generate sekarang!", style: TextStyle(fontStyle: FontStyle.italic, color: Colors.grey))
+                    ? Text("There are no active tasks yet", style: TextStyle(fontStyle: FontStyle.italic, color: Colors.grey))
                     : Column(children: _activeTasks.map((task) => _buildTaskItem(task)).toList()),
                 ],
               ),
@@ -220,7 +220,7 @@ class _HomePageState extends State<HomePage> {
         trailing: IconButton(
           icon: Icon(Icons.check_circle_outline, color: Colors.grey, size: 32),
           onPressed: () => _completeTask(task['id']),
-          tooltip: "Tandai Selesai",
+          tooltip: "Mark as complete",
         ),
       ),
     );
