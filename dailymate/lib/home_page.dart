@@ -2,12 +2,18 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'dart:math'; // Diperlukan untuk fitur Random
 
-class HomePage extends StatefulWidget {
+// Import halaman lain untuk navigasi
+import 'history_page.dart';
+import 'profile_page.dart';
+
+// --- BAGIAN 1: KONTEN UTAMA HOME (Logika Task & XP) ---
+// (Dulu namanya HomePage, sekarang kita ganti jadi HomeContent agar bisa dibungkus navigasi)
+class HomeContent extends StatefulWidget {
   @override
-  _HomePageState createState() => _HomePageState();
+  _HomeContentState createState() => _HomeContentState();
 }
 
-class _HomePageState extends State<HomePage> {
+class _HomeContentState extends State<HomeContent> {
   final _supabase = Supabase.instance.client;
   List<Map<String, dynamic>> _activeTasks = [];
   bool _isLoading = true;
@@ -22,19 +28,21 @@ class _HomePageState extends State<HomePage> {
   Future<void> _fetchUserTasks() async {
     try {
       final response = await _supabase
-          .from('user_tasks') // TABEL BARU
+          .from('user_tasks')
           .select('*')
           .eq('user_id', _supabase.auth.currentUser!.id)
           .eq('is_completed', false) // Hanya ambil yang belum selesai
           .order('created_at', ascending: false);
 
-      setState(() {
-        _activeTasks = List<Map<String, dynamic>>.from(response);
-        _isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _activeTasks = List<Map<String, dynamic>>.from(response);
+          _isLoading = false;
+        });
+      }
     } catch (error) {
       print('Error fetching tasks: $error');
-      setState(() => _isLoading = false);
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
@@ -42,7 +50,9 @@ class _HomePageState extends State<HomePage> {
   Future<void> _showCategorySelector() async {
     showModalBottomSheet(
       context: context,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
       builder: (context) {
         return Container(
           padding: EdgeInsets.all(20),
@@ -59,6 +69,7 @@ class _HomePageState extends State<HomePage> {
                   _categoryButton('Literature', Icons.book, Colors.orange),
                 ],
               ),
+              SizedBox(height: 10),
             ],
           ),
         );
@@ -115,49 +126,113 @@ class _HomePageState extends State<HomePage> {
       // 4. Refresh tampilan
       await _fetchUserTasks();
       
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('New task created successfully!')),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('New task created successfully!')),
+        );
+      }
 
     } catch (error) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error: $error'), backgroundColor: Colors.red),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $error'), backgroundColor: Colors.red),
+        );
+      }
     } finally {
-      setState(() => _isLoading = false);  
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
-  Future<void> _completeTask(int id) async {
+  // Helper untuk menentukan kolom database mana yang harus diupdate
+  String _getXpColumn(String category) {
+    switch (category) {
+      case 'Health':
+        return 'health_xp';
+      case 'Social':
+        return 'social_xp';
+      case 'Literature':
+        return 'lit_xp';
+      default:
+        return 'health_xp'; // Default fallback
+    }
+  }
+
+  // Fungsi Complete Task dengan Logika XP
+  Future<void> _completeTask(Map<String, dynamic> task) async {
+    final int taskId = task['id'];
+    final int xpReward = task['xp_reward'] ?? 0;
+    final String category = task['category'];
+    final String userId = _supabase.auth.currentUser!.id;
+
+    setState(() => _isLoading = true);
+
     try {
+      // 1. Update status tugas di tabel 'user_tasks' menjadi completed
       await _supabase
           .from('user_tasks')
           .update({
             'is_completed': true, 
             'completed_at': DateTime.now().toIso8601String()
           })
-          .eq('id', id);
+          .eq('id', taskId);
 
-      _fetchUserTasks(); // Refresh list
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Task completed! XP increased by')),
-      );
+      // 2. Ambil data profil user saat ini
+      final profileData = await _supabase
+          .from('profiles')
+          .select()
+          .eq('id', userId)
+          .single();
+      
+      // Tentukan kolom mana yang mau ditambah
+      final String targetColumn = _getXpColumn(category);
+      
+      // Hitung nilai baru
+      final int currentXp = profileData[targetColumn] ?? 0;
+      final int currentTotalTasks = profileData['total_tasks_completed'] ?? 0;
+      
+      // 3. Update tabel 'profiles' dengan XP baru
+      await _supabase.from('profiles').update({
+        targetColumn: currentXp + xpReward,
+        'total_tasks_completed': currentTotalTasks + 1,
+        'last_active_date': DateTime.now().toIso8601String(),
+      }).eq('id', userId);
+
+      // 4. Refresh tampilan list tugas
+      await _fetchUserTasks(); 
+      
+      // 5. Tampilkan SnackBar
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                Icon(Icons.workspace_premium, color: Colors.yellow),
+                SizedBox(width: 8),
+                Text('Task completed! ${category} XP increased by $xpReward'),
+              ],
+            ),
+            backgroundColor: Colors.green[700],
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+
     } catch (error) {
       print('Error completing task: $error');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error updating XP: $error'), backgroundColor: Colors.red),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    // Scaffold di sini TANPA AppBar, karena AppBar dikelola oleh HomePage Wrapper
     return Scaffold(
-      appBar: AppBar(
-        title: Text('Homepage'),
-        backgroundColor: Colors.blue,
-        foregroundColor: Colors.white,
-        actions: [
-          IconButton(icon: Icon(Icons.logout), onPressed: () async { await _supabase.auth.signOut(); }),
-        ],
-      ),
       body: _isLoading
           ? Center(child: CircularProgressIndicator())
           : SingleChildScrollView(
@@ -181,7 +256,7 @@ class _HomePageState extends State<HomePage> {
                         Text('Generate some from the button below!', style: TextStyle(color: Colors.grey[600])),
                         SizedBox(height: 16),
                         ElevatedButton(
-                          onPressed: _showCategorySelector, // Munculkan pilihan kategori
+                          onPressed: _showCategorySelector,
                           child: Text('GENERATE TASK'),
                           style: ElevatedButton.styleFrom(
                             backgroundColor: Colors.blue,
@@ -192,7 +267,6 @@ class _HomePageState extends State<HomePage> {
                       ],
                     ),
                   ),
-                  
                   SizedBox(height: 24),
                   
                   // LIST TUGAS AKTIF
@@ -220,7 +294,7 @@ class _HomePageState extends State<HomePage> {
         subtitle: Text("${task['category']} • +${task['xp_reward']} XP"),
         trailing: IconButton(
           icon: Icon(Icons.check_circle_outline, color: Colors.grey, size: 32),
-          onPressed: () => _completeTask(task['id']),
+          onPressed: () => _completeTask(task),
           tooltip: "Mark as complete",
         ),
       ),
@@ -242,6 +316,74 @@ class _HomePageState extends State<HomePage> {
       case 'Social': return Icons.people;
       case 'Literature': return Icons.book;
       default: return Icons.task;
+    }
+  }
+}
+
+// --- BAGIAN 2: WRAPPER UTAMA (Navigasi Bawah) ---
+class HomePage extends StatefulWidget {
+  @override
+  _HomePageState createState() => _HomePageState();
+}
+
+class _HomePageState extends State<HomePage> {
+  int _currentIndex = 0;
+
+  // Daftar halaman untuk setiap tab navigasi
+  final List<Widget> _pages = [
+    HomeContent(), // Halaman Utama (Kode di atas)
+    HistoryPage(), // Halaman History
+    ProfilePage(), // Halaman Profil
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      // AppBar dinamis sesuai tab yang aktif
+      appBar: AppBar(
+        title: Text(_getAppBarTitle()),
+        backgroundColor: Colors.blue,
+        foregroundColor: Colors.white,
+        automaticallyImplyLeading: false, // Hilangkan tombol back default
+      ),
+      
+      // Menampilkan halaman sesuai tab yang dipilih
+      body: _pages[_currentIndex],
+
+      // Menu Navigasi Bawah
+      bottomNavigationBar: BottomNavigationBar(
+        currentIndex: _currentIndex,
+        selectedItemColor: Colors.blue,
+        unselectedItemColor: Colors.grey,
+        onTap: (index) {
+          setState(() {
+            _currentIndex = index;
+          });
+        },
+        items: const [
+          BottomNavigationBarItem(
+            icon: Icon(Icons.home),
+            label: 'Home',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.history),
+            label: 'History',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.person),
+            label: 'Profile',
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _getAppBarTitle() {
+    switch (_currentIndex) {
+      case 0: return 'DailyMate';
+      case 1: return 'History';
+      case 2: return 'Profile';
+      default: return 'DailyMate';
     }
   }
 }
